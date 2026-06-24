@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap');
@@ -241,7 +242,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
     <div class="table-toolbar">
       <span style="font-weight:700;font-size:.95rem;color:var(--primary-dark)">📋 ตารางสรุป — ฝ่าย / กอง / สาขา</span>
       <button class="btn btn-success btn-sm" onclick="exportSummaryExcel()">⬇ Export Excel</button>
-      <button class="btn btn-danger btn-sm" onclick="exportSummaryPDF()">📄 Export PDF</button>
+      <button class="btn btn-danger btn-sm" onclick="exportSummaryPDF(this)">📄 Export PDF</button>
     </div>
     <div class="summary-table-wrap">
       <table class="data-table" id="summaryTable">
@@ -266,7 +267,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
       <span style="font-weight:700;font-size:.95rem;color:var(--primary-dark)">📑 ตารางรายละเอียด</span>
       <input class="search-box" id="detailSearch" type="text" placeholder="🔎 ค้นหาชื่อ/โครงการ..." oninput="filterDetail()">
       <button class="btn btn-success btn-sm" onclick="exportDetailExcel()">⬇ Export Excel</button>
-      <button class="btn btn-danger btn-sm" onclick="exportDetailPDF()">📄 Export PDF</button>
+      <button class="btn btn-danger btn-sm" onclick="exportDetailPDF(this)">📄 Export PDF</button>
       <span class="table-count" id="detailCount"></span>
     </div>
     <div class="detail-table-wrap">
@@ -666,12 +667,90 @@ function exportSummaryExcel() {
   XLSX.writeFile(wb,'summary_contract.xlsx');
 }
 
-function exportSummaryPDF() {
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  doc.text('ตารางสรุปจัดประโยชน์ไม่ต่อสัญญา',14,14);
-  doc.autoTable({html:'#summaryTable',startY:20,styles:{fontSize:8},headStyles:{fillColor:[21,101,192]}});
-  doc.save('summary_contract.pdf');
+async function captureTableToPDF(tableEl, titleText, filename) {
+  const {jsPDF} = window.jspdf;
+
+  // Clone table into a styled offscreen div for clean capture
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:16px;font-family:Sarabun,sans-serif;width:1100px;';
+
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size:15px;font-weight:800;color:#1565C0;margin-bottom:6px;font-family:Sarabun,sans-serif;';
+  titleEl.textContent = titleText;
+
+  const subtitleEl = document.createElement('div');
+  subtitleEl.style.cssText = 'font-size:11px;color:#546E7A;margin-bottom:10px;font-family:Sarabun,sans-serif;';
+  subtitleEl.textContent = `วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH')}`;
+
+  const tableClone = tableEl.cloneNode(true);
+  tableClone.style.cssText = 'width:100%;border-collapse:collapse;font-family:Sarabun,sans-serif;font-size:11px;';
+  // Fix th styles inline
+  tableClone.querySelectorAll('th').forEach(th => {
+    th.style.cssText = 'background:#1565C0;color:#fff;padding:8px 10px;text-align:left;font-weight:700;font-size:11px;font-family:Sarabun,sans-serif;white-space:nowrap;';
+  });
+  tableClone.querySelectorAll('td').forEach(td => {
+    td.style.fontFamily = 'Sarabun,sans-serif';
+    td.style.padding = '6px 10px';
+    td.style.borderBottom = '1px solid #E8EAF6';
+    td.style.fontSize = '10.5px';
+  });
+  tableClone.querySelectorAll('tr.row-group td').forEach(td => {
+    td.style.background = '#E8EAF6'; td.style.fontWeight = '700';
+  });
+  tableClone.querySelectorAll('tr.row-subgroup td').forEach(td => {
+    td.style.background = '#F0F4FF'; td.style.fontWeight = '600';
+  });
+  tableClone.querySelectorAll('tr.row-total td').forEach(td => {
+    td.style.background = '#1565C0'; td.style.color = '#fff'; td.style.fontWeight = '800';
+  });
+
+  wrapper.appendChild(titleEl);
+  wrapper.appendChild(subtitleEl);
+  wrapper.appendChild(tableClone);
+  document.body.appendChild(wrapper);
+
+  try {
+    const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const usableW = pageW - margin * 2;
+    const imgW = canvas.width;
+    const imgH = canvas.height;
+    const ratio = usableW / imgW;
+    let y = margin;
+    let srcY = 0;
+    const sliceH = Math.floor(pageH / ratio) - margin * 2;
+
+    while (srcY < imgH) {
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = imgW;
+      sliceCanvas.height = Math.min(sliceH, imgH - srcY);
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, -srcY);
+      pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, usableW, sliceCanvas.height * ratio);
+      srcY += sliceH;
+      if (srcY < imgH) pdf.addPage();
+    }
+
+    pdf.save(filename);
+  } finally {
+    document.body.removeChild(wrapper);
+  }
+}
+
+async function exportSummaryPDF(btn) {
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳ กำลังสร้าง PDF...'; btn.disabled = true;
+  try {
+    await captureTableToPDF(
+      document.getElementById('summaryTable'),
+      `Dashboard จัดประโยชน์ไม่ต่อสัญญา — ตารางสรุปฝ่าย/กอง/สาขา  (${filteredData.length.toLocaleString()} รายการ)`,
+      'summary_contract.pdf'
+    );
+  } finally { btn.innerHTML = orig; btn.disabled = false; }
 }
 
 function exportDetailExcel() {
@@ -684,14 +763,88 @@ function exportDetailExcel() {
   XLSX.writeFile(wb,'detail_contract.xlsx');
 }
 
-function exportDetailPDF() {
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  doc.text('ตารางรายละเอียดจัดประโยชน์ไม่ต่อสัญญา',14,14);
-  const rows=detailFiltered.slice(0,500).map((r,i)=>[i+1,r['สาขา'],r['โครงการ'],r['ชื่อผู้ทำสัญญา'],r['วันที่เริ่มต้น'],r['วันที่สิ้นสุด'],r['กำหนดต่อสัญญา'],r['กิจกรรม'],r['การดำเนินการ']]);
-  doc.autoTable({head:[['#','สาขา','โครงการ','ชื่อผู้ทำสัญญา','เริ่มต้น','สิ้นสุด','กำหนด','กิจกรรม','ดำเนินการ']],body:rows,startY:20,styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[21,101,192]},columnStyles:{0:{cellWidth:8},2:{cellWidth:40},7:{cellWidth:40}}});
-  if(detailFiltered.length>500) doc.text(`(แสดง 500 รายการแรกจาก ${detailFiltered.length} รายการ)`,14,doc.lastAutoTable.finalY+6);
-  doc.save('detail_contract.pdf');
+async function exportDetailPDF(btn) {
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳ กำลังสร้าง PDF...'; btn.disabled = true;
+  try {
+    // Build a clean plain table for capture (no sticky headers, no overflow)
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:16px;font-family:Sarabun,sans-serif;width:1400px;';
+
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = 'font-size:15px;font-weight:800;color:#1565C0;margin-bottom:6px;font-family:Sarabun,sans-serif;';
+    titleEl.textContent = `Dashboard จัดประโยชน์ไม่ต่อสัญญา — ตารางรายละเอียด (${detailFiltered.length.toLocaleString()} รายการ)`;
+
+    const subtitleEl = document.createElement('div');
+    subtitleEl.style.cssText = 'font-size:11px;color:#546E7A;margin-bottom:10px;font-family:Sarabun,sans-serif;';
+    subtitleEl.textContent = `วันที่พิมพ์: ${new Date().toLocaleDateString('th-TH')}`;
+
+    const cols = ['#','สาขา','โครงการ','ชื่อผู้ทำสัญญา','วันที่เริ่มต้น','วันที่สิ้นสุด','กำหนดต่อสัญญา','กิจกรรม','การดำเนินการ','กลุ่มดำเนินการ','สถานะสัญญา','หมายเหตุ'];
+    const colW = ['40px','110px','200px','140px','90px','90px','130px','160px','120px','120px','110px','auto'];
+
+    const tbl = document.createElement('table');
+    tbl.style.cssText = 'width:100%;border-collapse:collapse;font-family:Sarabun,sans-serif;font-size:10px;';
+    const thead = document.createElement('thead');
+    const hRow = document.createElement('tr');
+    cols.forEach((c,i) => {
+      const th = document.createElement('th');
+      th.textContent = c;
+      th.style.cssText = `background:#1565C0;color:#fff;padding:7px 8px;text-align:left;font-weight:700;font-size:10px;font-family:Sarabun,sans-serif;white-space:nowrap;width:${colW[i]};`;
+      hRow.appendChild(th);
+    });
+    thead.appendChild(hRow);
+    tbl.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    detailFiltered.forEach((r,i) => {
+      const tr = document.createElement('tr');
+      tr.style.background = i%2===0 ? '#fff' : '#F8F9FF';
+      const vals = [i+1, r['สาขา']||'', r['โครงการ']||'', r['ชื่อผู้ทำสัญญา']||'', r['วันที่เริ่มต้น']||'', r['วันที่สิ้นสุด']||'', r['กำหนดต่อสัญญา']||'', r['กิจกรรม']||'', r['การดำเนินการ']||'', r['กลุ่มดำเนินการ']||'', r['สถานะสัญญา']||'', r['หมายเหตุ']||''];
+      vals.forEach((v,ci) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        let color = '#1A237E';
+        if (ci===6 && v==='พ้นกำหนด') color='#C62828';
+        else if (ci===6 && v==='จะครบสัญญาภายใน 3 เดือน') color='#F57F17';
+        else if (ci===10 && v==='ไม่ต่อสัญญาเช่า') color='#C62828';
+        else if (ci===10 && v==='ปกติ') color='#2E7D32';
+        td.style.cssText = `padding:5px 8px;border-bottom:1px solid #E8EAF6;font-size:10px;font-family:Sarabun,sans-serif;color:${color};vertical-align:top;word-break:break-word;`;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+
+    wrapper.appendChild(titleEl);
+    wrapper.appendChild(subtitleEl);
+    wrapper.appendChild(tbl);
+    document.body.appendChild(wrapper);
+
+    const {jsPDF} = window.jspdf;
+    const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+    const usableW = pageW - margin * 2;
+    const ratio = usableW / canvas.width;
+    const sliceH = Math.floor((pageH - margin * 2) / ratio);
+    let srcY = 0;
+
+    while (srcY < canvas.height) {
+      const h = Math.min(sliceH, canvas.height - srcY);
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width; slice.height = h;
+      slice.getContext('2d').drawImage(canvas, 0, -srcY);
+      pdf.addImage(slice.toDataURL('image/png'), 'PNG', margin, margin, usableW, h * ratio);
+      srcY += sliceH;
+      if (srcY < canvas.height) pdf.addPage();
+    }
+
+    document.body.removeChild(wrapper);
+    pdf.save('detail_contract.pdf');
+  } finally { btn.innerHTML = orig; btn.disabled = false; }
 }
 
 // Boot: decompress then init
