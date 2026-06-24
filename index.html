@@ -209,20 +209,12 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
           <div class="cb-filter-row" id="cbSathanaSanya" style="flex-direction:column;align-items:flex-start;gap:6px"></div>
         </div>
       </div>
-      <!-- Ranking Charts inside filter panel -->
+      <!-- Ranking Chart inside filter panel -->
       <hr style="border:none;border-top:2px dashed var(--border);margin:14px 0">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px">
-        <div>
-          <span class="cb-filter-label">📊 Ranking กลุ่มดำเนินการ (จำนวนรายการ)</span>
-          <div style="position:relative;height:200px;background:#F8F9FF;border-radius:10px;padding:10px 10px 10px 10px;border:1px solid var(--border)">
-            <canvas id="chartDamnoen"></canvas>
-          </div>
-        </div>
-        <div>
-          <span class="cb-filter-label">📊 Ranking สถานะสัญญา (จำนวนรายการ)</span>
-          <div style="position:relative;height:200px;background:#F8F9FF;border-radius:10px;padding:10px 10px 10px 10px;border:1px solid var(--border)">
-            <canvas id="chartSathana"></canvas>
-          </div>
+      <div style="margin-bottom:14px">
+        <span class="cb-filter-label">📊 Ranking กลุ่มดำเนินการ (จำนวนรายการ)</span>
+        <div style="position:relative;height:200px;background:#F8F9FF;border-radius:10px;padding:10px;border:1px solid var(--border)">
+          <canvas id="chartDamnoen"></canvas>
         </div>
       </div>
 
@@ -342,7 +334,7 @@ let filteredData = [];
 let detailFiltered = [];
 let currentPage = 1;
 const PAGE_SIZE = 50;
-let chartSakha = null, chartProject = null, chartDamnoen = null, chartSathana = null;
+let chartSakha = null, chartProject = null, chartDamnoen = null;
 
 const statusColors = {
   'พ้นกำหนด': 'badge-danger',
@@ -604,39 +596,6 @@ function updateCharts() {
     }
   });
 
-  // Ranking: สถานะสัญญา
-  const sathanaMap = {};
-  filteredData.forEach(r => { const k = r['สถานะสัญญา']||'ไม่ระบุ'; sathanaMap[k] = (sathanaMap[k]||0)+1; });
-  const sathanaEntries = Object.entries(sathanaMap).sort((a,b) => b[1]-a[1]);
-
-  const sathanaColorMap = {
-    'ปกติ': '#2E7D32',
-    'ไม่ต่อสัญญาเช่า': '#C62828',
-    'ติดตามหนี้': '#F57F17',
-  };
-  const sathanaColors = sathanaEntries.map(e => sathanaColorMap[e[0]] || '#546E7A');
-
-  if (chartSathana) chartSathana.destroy();
-  chartSathana = new Chart(document.getElementById('chartSathana'), {
-    type: 'bar',
-    data: {
-      labels: sathanaEntries.map(e => e[0]),
-      datasets: [{
-        label: 'จำนวนรายการ',
-        data: sathanaEntries.map(e => e[1]),
-        backgroundColor: sathanaColors,
-        borderRadius: 5, borderSkipped: false,
-      }]
-    },
-    options: {
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw.toLocaleString()} รายการ`}}},
-      scales:{
-        x:{ticks:{font:{family:'Sarabun',size:11}}, grid:{color:'rgba(0,0,0,0.05)'}},
-        y:{ticks:{font:{family:'Sarabun',size:11},maxTicksLimit:10}}
-      }
-    }
-  });
 }
 
 function renderSummaryTable() {
