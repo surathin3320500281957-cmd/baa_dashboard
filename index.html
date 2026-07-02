@@ -120,6 +120,35 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 ::-webkit-scrollbar-thumb { background: #b0b8c9; border-radius: 10px; border: 4px solid #f1f1f1; }
 ::-webkit-scrollbar-thumb:hover { background: #8892a4; }
 * { scrollbar-width: auto; scrollbar-color: #b0b8c9 #f1f1f1; }
+
+/* Filter zone styles */
+.filter-zone {
+  border-radius: 10px;
+  padding: 10px 14px 10px 18px;
+  margin-bottom: 10px;
+  border-left: 5px solid;
+  position: relative;
+}
+.filter-zone-label {
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.zone-kamnod   { background: #fff8e1; border-color: #f59e0b; }
+.zone-kamnod   .filter-zone-label { color: #b45309; }
+.zone-notify   { background: #fef2f2; border-color: #ef4444; }
+.zone-notify   .filter-zone-label { color: #b91c1c; }
+.zone-activity { background: #f0fdf4; border-color: #22c55e; }
+.zone-activity .filter-zone-label { color: #15803d; }
+.zone-damnoen  { background: #eff6ff; border-color: #3b82f6; }
+.zone-damnoen  .filter-zone-label { color: #1d4ed8; }
+.zone-status   { background: #faf5ff; border-color: #a855f7; }
+.zone-status   .filter-zone-label { color: #7e22ce; }
 </style>
 </head>
 <body>
@@ -193,26 +222,25 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
           <select class="filter-select" id="selProject"><option value="">-- ทั้งหมด --</option></select>
         </div>
       </div>
-      <div style="margin-bottom:10px">
-        <span class="cb-filter-label">📌 กำหนดต่อสัญญา</span>
+      <div class="filter-zone zone-kamnod">
+        <div class="filter-zone-label">📌 กำหนดต่อสัญญา</div>
         <div class="cb-filter-row" id="cbKamnod"></div>
       </div>
-      <div style="margin-bottom:10px">
-        <span class="cb-filter-label">🔔 การแจ้งเตือน</span>
+      <div class="filter-zone zone-notify">
+        <div class="filter-zone-label">🔔 การแจ้งเตือน</div>
         <div class="cb-filter-row" id="cbNotify"></div>
       </div>
-      <div style="margin-bottom:10px">
-        <span class="cb-filter-label">🏪 กิจกรรม</span>
+      <div class="filter-zone zone-activity">
+        <div class="filter-zone-label">🏪 กิจกรรม</div>
         <div class="cb-filter-row" id="cbActivity"></div>
       </div>
-      <hr style="border:none;border-top:2px dashed var(--border);margin:14px 0">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:10px">
-        <div>
-          <span class="cb-filter-label">📋 กลุ่มดำเนินการ</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px">
+        <div class="filter-zone zone-damnoen" style="margin-bottom:0">
+          <div class="filter-zone-label">📋 กลุ่มดำเนินการ</div>
           <div class="cb-filter-row" id="cbDamnoenkan" style="flex-direction:column;align-items:flex-start;gap:6px"></div>
         </div>
-        <div>
-          <span class="cb-filter-label">📄 สถานะสัญญา</span>
+        <div class="filter-zone zone-status" style="margin-bottom:0">
+          <div class="filter-zone-label">📄 สถานะสัญญา</div>
           <div class="cb-filter-row" id="cbSathanaSanya" style="flex-direction:column;align-items:flex-start;gap:6px"></div>
         </div>
       </div>
