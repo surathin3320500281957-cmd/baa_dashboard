@@ -283,6 +283,20 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 
   <div class="section">
     <div class="table-toolbar">
+      <span style="font-weight:700;font-size:.95rem;color:var(--primary-dark)">📊 ตารางสรุปตามกลุ่มดำเนินการ — ฝ่าย / กอง / สาขา</span>
+      <button class="btn btn-success btn-sm" onclick="exportActionSummaryExcel()">⬇ Export Excel</button>
+      <button class="btn btn-danger btn-sm" onclick="exportActionSummaryPDF(this)">📄 Export PDF</button>
+    </div>
+    <div class="summary-table-wrap">
+      <table class="data-table" id="actionSummaryTable">
+        <thead id="actionSummaryHead"></thead>
+        <tbody id="actionSummaryBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="table-toolbar">
       <span style="font-weight:700;font-size:.95rem;color:var(--primary-dark)">📋 ตารางสรุป — ฝ่าย / กอง / สาขา</span>
       <button class="btn btn-success btn-sm" onclick="exportSummaryExcel()">⬇ Export Excel</button>
       <button class="btn btn-danger btn-sm" onclick="exportSummaryPDF(this)">📄 Export PDF</button>
@@ -369,6 +383,7 @@ let detailFiltered = [];
 let currentPage = 1;
 const PAGE_SIZE = 50;
 let chartSakha = null, chartProject = null, chartDamnoen = null;
+let ACTION_CATS = null;
 if (typeof ChartDataLabels !== 'undefined') {
   Chart.register(ChartDataLabels);
   Chart.defaults.set('plugins.datalabels', { display: false });
@@ -560,6 +575,7 @@ function filterDetail() {
 function updateAll() {
   updateKPIs();
   updateCharts();
+  renderActionSummaryTable();
   renderSummaryTable();
   filterDetail();
   document.getElementById('resultCount').textContent = `พบ ${filteredData.length.toLocaleString()} รายการ`;
@@ -656,6 +672,97 @@ function updateCharts() {
     }
   });
 
+}
+
+function getActionCategories() {
+  if (ACTION_CATS) return ACTION_CATS;
+  const seen = new Map();
+  RAW_DATA.forEach(r => {
+    const v = r['การดำเนินการ'] || '';
+    if (!seen.has(v)) seen.set(v, true);
+  });
+  const cats = [...seen.keys()];
+  cats.sort((a, b) => {
+    const na = parseInt(a, 10), nb = parseInt(b, 10);
+    const va = isNaN(na) ? Infinity : na;
+    const vb = isNaN(nb) ? Infinity : nb;
+    if (va !== vb) return va - vb;
+    return a.localeCompare(b, 'th');
+  });
+  ACTION_CATS = cats.map(v => ({ key: v, label: v === '' ? 'ไม่ระบุ' : v }));
+  return ACTION_CATS;
+}
+
+function renderActionSummaryTable() {
+  const cats = getActionCategories();
+  const thead = document.getElementById('actionSummaryHead');
+  const body = document.getElementById('actionSummaryBody');
+  thead.innerHTML = `
+    <tr>
+      <th style="position:sticky;left:0;z-index:2">ฝ่าย / กอง / สาขา</th>
+      ${cats.map(c => `<th>${c.label}</th>`).join('')}
+      <th>รวม</th>
+    </tr>`;
+  body.innerHTML = '';
+
+  const structure = {};
+  filteredData.forEach(r => {
+    const fay = r['ฝ่าย']||'ไม่ระบุ', kong = r['กอง']||'ไม่ระบุ', sakha = r['สาขา']||'ไม่ระบุ';
+    if (!structure[fay]) structure[fay] = {};
+    if (!structure[fay][kong]) structure[fay][kong] = {};
+    if (!structure[fay][kong][sakha]) structure[fay][kong][sakha] = [];
+    structure[fay][kong][sakha].push(r);
+  });
+
+  const zeroCounts = () => Object.fromEntries(cats.map(c => [c.key, 0]));
+  const gCounts = zeroCounts(); let gTotal = 0;
+  const rows = [];
+
+  Object.entries(structure).forEach(([fay, kongs]) => {
+    const fCounts = zeroCounts(); let fTotal = 0;
+    const fayStart = rows.length;
+
+    Object.entries(kongs).forEach(([kong, sakhas]) => {
+      const kCounts = zeroCounts(); let kTotal = 0;
+      const kongStart = rows.length;
+
+      Object.entries(sakhas).forEach(([sakha, recs]) => {
+        const counts = zeroCounts();
+        recs.forEach(r => { const k = r['การดำเนินการ']||''; counts[k] = (counts[k]||0)+1; });
+        const total = recs.length;
+        rows.push({type:'sakha', label:`└ ${sakha}`, counts, total});
+        cats.forEach(c => kCounts[c.key] += counts[c.key]); kTotal += total;
+      });
+
+      rows.splice(kongStart, 0, {type:'kong', label:`▸ กอง: ${kong}`, counts:kCounts, total:kTotal});
+      cats.forEach(c => fCounts[c.key] += kCounts[c.key]); fTotal += kTotal;
+    });
+
+    rows.splice(fayStart, 0, {type:'fay', label:`◆ ${fay}`, counts:fCounts, total:fTotal});
+    cats.forEach(c => gCounts[c.key] += fCounts[c.key]); gTotal += fTotal;
+  });
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    if (r.type==='fay') tr.className='row-group';
+    else if (r.type==='kong') tr.className='row-subgroup';
+    const indent = r.type==='fay' ? '4px' : r.type==='kong' ? '16px' : '32px';
+    tr.innerHTML = `
+      <td class="td-top" style="padding-left:${indent};position:sticky;left:0;background:inherit">${r.label}</td>
+      ${cats.map(c => `<td class="num">${r.counts[c.key] ? r.counts[c.key].toLocaleString() : '-'}</td>`).join('')}
+      <td class="num" style="font-weight:700">${r.total.toLocaleString()}</td>
+    `;
+    body.appendChild(tr);
+  });
+
+  const trTotal = document.createElement('tr');
+  trTotal.className = 'row-total';
+  trTotal.innerHTML = `
+    <td style="font-size:1rem;position:sticky;left:0;background:inherit">🔢 รวมทั้งหมด</td>
+    ${cats.map(c => `<td class="num" style="color:#fff">${gCounts[c.key] ? gCounts[c.key].toLocaleString() : '-'}</td>`).join('')}
+    <td class="num" style="color:#fff;font-size:1rem">${gTotal.toLocaleString()}</td>
+  `;
+  body.appendChild(trTotal);
 }
 
 function renderSummaryTable() {
@@ -760,6 +867,54 @@ function renderDetailTable() {
 
 function renderPagination() {
   // No pagination - all rows displayed
+}
+
+function exportActionSummaryExcel() {
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.table_to_sheet(document.getElementById('actionSummaryTable'));
+  XLSX.utils.book_append_sheet(wb,ws,'สรุปกลุ่มดำเนินการ');
+  XLSX.writeFile(wb,'summary_action_group.xlsx');
+}
+
+function exportActionSummaryPDF(btn){
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳ กำลังสร้าง PDF...'; btn.disabled = true;
+  try {
+    const tableHtml = document.getElementById('actionSummaryTable').outerHTML;
+    const title = 'Dashboard จัดประโยชน์ไม่ต่อสัญญา — ตารางสรุปตามกลุ่มดำเนินการ';
+    const now = new Date().toLocaleString('th-TH');
+    const html = `<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  @page { size: A4 landscape; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Sarabun','Segoe UI',sans-serif; margin:0; padding:0; color:#1a1a1a; }
+  h1 { font-size:15px; color:#1565C0; margin:0 0 4px; }
+  .meta { font-size:11px; color:#666; margin-bottom:12px; }
+  table { width:100%; border-collapse:collapse; font-size:9px; }
+  th { background:linear-gradient(135deg,#42A5F5,#1E88E5); color:#fff; padding:5px 6px; text-align:left; font-weight:700; white-space:normal; }
+  td { padding:4px 6px; border-bottom:1px solid #e5e5e5; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+  .row-group td { background:linear-gradient(90deg,#E8EAF6,#F5F5F5) !important; font-weight:700 !important; }
+  .row-subgroup td { background:#F0F4FF !important; font-weight:600 !important; }
+  .row-total td { background:linear-gradient(90deg,#1565C0,#1976D2) !important; color:#fff !important; font-weight:800 !important; }
+  tr { break-inside: avoid; }
+  thead { display: table-header-group; }
+</style></head>
+<body>
+  <h1>${title}</h1>
+  <div class="meta">พิมพ์เมื่อ ${now} &middot; ทั้งหมด ${filteredData.length.toLocaleString('th-TH')} รายการ</div>
+  ${tableHtml}
+  <script>
+    window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };
+  <\/script>
+</body></html>`;
+    const blob = new Blob([html], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } finally { btn.innerHTML = orig; btn.disabled = false; }
 }
 
 function exportSummaryExcel() {
