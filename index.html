@@ -59,6 +59,15 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .cb-chip.active-warning{background:var(--warning);border-color:var(--warning);color:#fff}
 .cb-chip.active-success{background:var(--success);border-color:var(--success);color:#fff}
 .cb-chip.active-info{background:var(--info);border-color:var(--info);color:#fff}
+.dk-chip{display:flex;flex-direction:column;align-items:flex-start;gap:7px;border-radius:12px;padding:10px 14px}
+.dk-top{display:flex;align-items:center;gap:8px;font-size:.88rem}
+.dk-stats{display:flex;flex-wrap:wrap;gap:6px}
+.dk-badge{padding:3px 10px;border-radius:10px;font-size:.76rem;font-weight:700;white-space:nowrap}
+.dk-badge-cnt{background:#E3F2FD;color:#1565C0}
+.dk-badge-rent{background:#E8F5E9;color:#2E7D32}
+.dk-badge-debt{background:#FFEBEE;color:#C62828}
+.dk-badge-debt.zero{background:#F1F3F4;color:#9AA0A6}
+.dk-chip.active .dk-badge{background:rgba(255,255,255,.25)!important;color:#fff!important}
 .filter-actions{display:flex;gap:10px;align-items:center;margin-top:12px}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;border:none;transition:all .15s}
 .btn-primary{background:var(--primary);color:#fff}
@@ -519,12 +528,17 @@ function buildDamnoenkanCheckboxes(containerId, vals) {
     const cnt = recs.length;
     const rent = recs.reduce((s,r) => s + (r['ค่างวดต่อเดือน']||0), 0);
     const debt = recs.reduce((s,r) => s + (r['หนี้ค้างเดือนก่อน']||0), 0);
-    const statText = `(${cnt.toLocaleString()} ราย • ค่างวด ${fmt(rent)} • หนี้ค้าง ${fmt(debt)})`;
 
     const chip = document.createElement('label');
-    chip.className = 'cb-chip';
+    chip.className = 'cb-chip dk-chip';
     chip.dataset.colorClass = 'active';
-    chip.innerHTML = `<input type="checkbox" value="${val}">${val} <span class="dk-stat" style="opacity:.65;font-weight:500;font-size:.85em">${statText}</span>`;
+    chip.innerHTML = `
+      <div class="dk-top"><input type="checkbox" value="${val}">${val}</div>
+      <div class="dk-stats">
+        <span class="dk-badge dk-badge-cnt">👥 ${cnt.toLocaleString()} ราย</span>
+        <span class="dk-badge dk-badge-rent">💰 ค่างวด ${fmt(rent)}</span>
+        <span class="dk-badge dk-badge-debt${debt>0?'':' zero'}">⚠️ หนี้ค้าง ${fmt(debt)}</span>
+      </div>`;
     chip.addEventListener('click', e => {
       e.preventDefault();
       const cb = chip.querySelector('input');
@@ -578,8 +592,15 @@ function refreshDamnoenkanStats() {
     const cnt = recs.length;
     const rent = recs.reduce((s,r) => s + (r['ค่างวดต่อเดือน']||0), 0);
     const debt = recs.reduce((s,r) => s + (r['หนี้ค้างเดือนก่อน']||0), 0);
-    const span = chip.querySelector('.dk-stat');
-    if (span) span.textContent = `(${cnt.toLocaleString()} ราย • ค่างวด ${fmt(rent)} • หนี้ค้าง ${fmt(debt)})`;
+    const cntEl = chip.querySelector('.dk-badge-cnt');
+    const rentEl = chip.querySelector('.dk-badge-rent');
+    const debtEl = chip.querySelector('.dk-badge-debt');
+    if (cntEl) cntEl.textContent = `👥 ${cnt.toLocaleString()} ราย`;
+    if (rentEl) rentEl.textContent = `💰 ค่างวด ${fmt(rent)}`;
+    if (debtEl) {
+      debtEl.textContent = `⚠️ หนี้ค้าง ${fmt(debt)}`;
+      debtEl.classList.toggle('zero', !(debt>0));
+    }
   });
 }
 
