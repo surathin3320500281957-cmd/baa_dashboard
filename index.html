@@ -459,7 +459,7 @@ function initFilters() {
     if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
     return a.localeCompare(b, 'th');
   });
-  buildCheckboxesSimple('cbDamnoenkan', damnoenkanVals);
+  buildDamnoenkanCheckboxes('cbDamnoenkan', damnoenkanVals);
 
   buildCheckboxes('cbSathanaSanya', 'สถานะสัญญา', {
     'ปกติ': 'active-success',
@@ -512,35 +512,82 @@ function buildCheckboxesSimple(containerId, vals) {
   });
 }
 
+function buildDamnoenkanCheckboxes(containerId, vals) {
+  const container = document.getElementById(containerId);
+  vals.forEach(val => {
+    const recs = RAW_DATA.filter(r => r['การดำเนินการ'] === val);
+    const cnt = recs.length;
+    const rent = recs.reduce((s,r) => s + (r['ค่างวดต่อเดือน']||0), 0);
+    const debt = recs.reduce((s,r) => s + (r['หนี้ค้างเดือนก่อน']||0), 0);
+    const statText = `(${cnt.toLocaleString()} ราย • ค่างวด ${fmt(rent)} • หนี้ค้าง ${fmt(debt)})`;
+
+    const chip = document.createElement('label');
+    chip.className = 'cb-chip';
+    chip.dataset.colorClass = 'active';
+    chip.innerHTML = `<input type="checkbox" value="${val}">${val} <span class="dk-stat" style="opacity:.65;font-weight:500;font-size:.85em">${statText}</span>`;
+    chip.addEventListener('click', e => {
+      e.preventDefault();
+      const cb = chip.querySelector('input');
+      cb.checked = !cb.checked;
+      chip.classList.toggle('active', cb.checked);
+      applyFilters();
+    });
+    container.appendChild(chip);
+  });
+}
+
 function getCheckedValues(containerId) {
   return [...document.querySelectorAll(`#${containerId} .cb-chip input:checked`)].map(c => c.value);
 }
 
-function applyFilters() {
-  const fay = document.getElementById('selFay').value;
-  const kong = document.getElementById('selKong').value;
-  const sakha = document.getElementById('selSakha').value;
-  const proj = document.getElementById('selProject').value;
-  const kamnodVals = getCheckedValues('cbKamnod');
-  const notifyVals = getCheckedValues('cbNotify');
-  const activityVals = getCheckedValues('cbActivity');
-  const damnoenkanVals = getCheckedValues('cbDamnoenkan');
-  const sathanaSanyaVals = getCheckedValues('cbSathanaSanya');
+function getFilterSelections() {
+  return {
+    fay: document.getElementById('selFay').value,
+    kong: document.getElementById('selKong').value,
+    sakha: document.getElementById('selSakha').value,
+    proj: document.getElementById('selProject').value,
+    kamnodVals: getCheckedValues('cbKamnod'),
+    notifyVals: getCheckedValues('cbNotify'),
+    activityVals: getCheckedValues('cbActivity'),
+    damnoenkanVals: getCheckedValues('cbDamnoenkan'),
+    sathanaSanyaVals: getCheckedValues('cbSathanaSanya'),
+  };
+}
 
-  filteredData = RAW_DATA.filter(r => {
-    if (fay && r['ฝ่าย'] !== fay) return false;
-    if (kong && r['กอง'] !== kong) return false;
-    if (sakha && r['สาขา'] !== sakha) return false;
-    if (proj && r['โครงการ'] !== proj) return false;
-    if (kamnodVals.length && !kamnodVals.includes(r['กำหนดต่อสัญญา'])) return false;
-    if (notifyVals.length && !notifyVals.includes(r['การแจ้งเตือน'])) return false;
-    if (activityVals.length && !activityVals.includes(r['กิจกรรม'])) return false;
-    if (damnoenkanVals.length && !damnoenkanVals.includes(r['การดำเนินการ'])) return false;
-    if (sathanaSanyaVals.length && !sathanaSanyaVals.includes(r['สถานะสัญญา'])) return false;
+function getFilteredExcept(exclude) {
+  const s = getFilterSelections();
+  return RAW_DATA.filter(r => {
+    if (s.fay && r['ฝ่าย'] !== s.fay) return false;
+    if (s.kong && r['กอง'] !== s.kong) return false;
+    if (s.sakha && r['สาขา'] !== s.sakha) return false;
+    if (s.proj && r['โครงการ'] !== s.proj) return false;
+    if (exclude !== 'kamnod' && s.kamnodVals.length && !s.kamnodVals.includes(r['กำหนดต่อสัญญา'])) return false;
+    if (exclude !== 'notify' && s.notifyVals.length && !s.notifyVals.includes(r['การแจ้งเตือน'])) return false;
+    if (exclude !== 'activity' && s.activityVals.length && !s.activityVals.includes(r['กิจกรรม'])) return false;
+    if (exclude !== 'damnoenkan' && s.damnoenkanVals.length && !s.damnoenkanVals.includes(r['การดำเนินการ'])) return false;
+    if (exclude !== 'sathanaSanya' && s.sathanaSanyaVals.length && !s.sathanaSanyaVals.includes(r['สถานะสัญญา'])) return false;
     return true;
   });
+}
+
+function refreshDamnoenkanStats() {
+  const base = getFilteredExcept('damnoenkan');
+  document.querySelectorAll('#cbDamnoenkan .cb-chip').forEach(chip => {
+    const val = chip.querySelector('input').value;
+    const recs = base.filter(r => r['การดำเนินการ'] === val);
+    const cnt = recs.length;
+    const rent = recs.reduce((s,r) => s + (r['ค่างวดต่อเดือน']||0), 0);
+    const debt = recs.reduce((s,r) => s + (r['หนี้ค้างเดือนก่อน']||0), 0);
+    const span = chip.querySelector('.dk-stat');
+    if (span) span.textContent = `(${cnt.toLocaleString()} ราย • ค่างวด ${fmt(rent)} • หนี้ค้าง ${fmt(debt)})`;
+  });
+}
+
+function applyFilters() {
+  filteredData = getFilteredExcept(null);
   detailFiltered = [...filteredData];
   currentPage = 1;
+  refreshDamnoenkanStats();
   updateAll();
 }
 
@@ -556,6 +603,7 @@ function resetFilters() {
   detailFiltered = [...RAW_DATA];
   document.getElementById('detailSearch').value = '';
   currentPage = 1;
+  refreshDamnoenkanStats();
   updateAll();
 }
 
