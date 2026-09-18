@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard จัดประโยชน์ไม่ต่อสัญญา - ฝ่าย ชบ.</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap');
@@ -100,7 +98,16 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .btn-danger{background:var(--danger);color:#fff}
 .btn-danger:hover{background:var(--danger-light)}
 .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:22px}
-.chart-container{position:relative;height:300px}
+.rank-list{max-height:440px;overflow-y:auto;padding:4px 4px 4px 0}
+.rank-list::-webkit-scrollbar{width:6px}
+.rank-list::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.rank-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.rank-row:last-child{margin-bottom:0}
+.rank-num{width:20px;flex-shrink:0;text-align:right;color:#94a3b8;font-weight:700;font-size:.85rem}
+.rank-bar-track{flex:1;display:flex;align-items:center;min-width:0}
+.rank-bar{height:34px;border-radius:8px;display:flex;align-items:center;padding:0 14px;color:#fff;font-weight:700;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:width .35s ease;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.rank-value{margin-left:8px;background:rgba(31,27,45,.85);color:#fff;font-weight:800;font-size:.82rem;padding:5px 11px;border-radius:6px;flex-shrink:0;white-space:nowrap}
+.rank-empty{padding:24px;text-align:center;color:#94a3b8;font-size:.9rem}
 .data-table{width:100%;border-collapse:collapse;font-size:.9rem}
 .data-table th{background:linear-gradient(135deg,#42A5F5,#1E88E5);color:#fff;padding:12px 14px;text-align:left;font-weight:700;font-size:.88rem;white-space:nowrap;position:sticky;top:0}
 .data-table td{padding:10px 14px;border-bottom:1px solid #E8EAF6;font-size:.9rem;vertical-align:top}
@@ -290,7 +297,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
         <span class="section-title">Ranking ตามสาขา (จำนวนรายการ)</span>
       </div>
       <div class="section-body">
-        <div class="chart-container"><canvas id="chartSakha"></canvas></div>
+        <div class="rank-list" id="chartSakha"></div>
       </div>
     </div>
     <div class="section">
@@ -299,7 +306,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
         <span class="section-title">Ranking ตามโครงการ (Top 15)</span>
       </div>
       <div class="section-body">
-        <div class="chart-container"><canvas id="chartProject"></canvas></div>
+        <div class="rank-list" id="chartProject"></div>
       </div>
     </div>
     <div class="section">
@@ -308,7 +315,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
         <span class="section-title">Ranking กลุ่มดำเนินการ</span>
       </div>
       <div class="section-body">
-        <div class="chart-container"><canvas id="chartDamnoen"></canvas></div>
+        <div class="rank-list" id="chartDamnoen"></div>
       </div>
     </div>
   </div>
@@ -414,33 +421,29 @@ let filteredData = [];
 let detailFiltered = [];
 let currentPage = 1;
 const PAGE_SIZE = 50;
-let chartSakha = null, chartProject = null, chartDamnoen = null;
 let ACTION_CATS = null;
-if (typeof ChartDataLabels !== 'undefined') {
-  Chart.register(ChartDataLabels);
-  Chart.defaults.set('plugins.datalabels', { display: false });
+// rainbow hue rotation across ranks, matching reference dashboard style
+function rankColor(i) {
+  const hue = (25 + i * 32) % 360;
+  return `hsl(${hue},70%,50%)`;
 }
-// shared overlay-label style for ranking charts (name at front of bar, value badge at tip)
-function rankDatalabels(nameColor) {
-  return {
-    display: true, clip: false, clamp: true,
-    color: nameColor || '#1f2937', textStrokeColor: '#fff', textStrokeWidth: 3,
-    font: { size: 13, family: 'Sarabun', weight: 600 },
-    labels: {
-      name: {
-        anchor: 'start', align: 'end', offset: 6,
-        formatter: (v, ctx) => ctx.chart.data.labels[ctx.dataIndex]
-      },
-      value: {
-        anchor: 'end', align: 'end', offset: 4,
-        textStrokeWidth: 0, color: '#fff',
-        backgroundColor: 'rgba(31,27,45,0.82)', borderRadius: 5,
-        padding: { top: 3, bottom: 3, left: 6, right: 6 },
-        font: { size: 13, family: 'Sarabun', weight: 700 },
-        formatter: v => v.toLocaleString()
-      }
-    }
-  };
+// render a rank-list (name pill bar + value badge), no overlap regardless of value spread
+function renderRankList(containerId, entries) {
+  const container = document.getElementById(containerId);
+  if (!entries.length) { container.innerHTML = '<div class="rank-empty">ไม่มีข้อมูล</div>'; return; }
+  const max = entries[0][1] || 1;
+  container.innerHTML = entries.map((e, i) => {
+    const [label, val] = e;
+    const pct = Math.max((val / max) * 100, 8);
+    return `
+      <div class="rank-row">
+        <span class="rank-num">${i+1}</span>
+        <div class="rank-bar-track">
+          <div class="rank-bar" style="width:${pct}%;background:${rankColor(i)}">${label}</div>
+          <span class="rank-value">${val.toLocaleString()}</span>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 const statusColors = {
@@ -689,81 +692,19 @@ function updateCharts() {
   const sakhaMap = {};
   filteredData.forEach(r => { const k = r['สาขา']||'ไม่ระบุ'; sakhaMap[k] = (sakhaMap[k]||0)+1; });
   const sakhaEntries = Object.entries(sakhaMap).sort((a,b) => b[1]-a[1]);
-
-  if (chartSakha) chartSakha.destroy();
-  chartSakha = new Chart(document.getElementById('chartSakha'), {
-    type: 'bar',
-    data: {
-      labels: sakhaEntries.map(e => e[0]),
-      datasets: [{
-        label: 'จำนวนรายการ',
-        data: sakhaEntries.map(e => e[1]),
-        backgroundColor: sakhaEntries.map((_,i) => `hsl(${210+i*14},75%,${50+(i%3)*8}%)`),
-        borderRadius: 6, borderSkipped: false,
-      }]
-    },
-    options: {
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      layout:{padding:{left:4,right:60}},
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw.toLocaleString()} รายการ`}}, datalabels: rankDatalabels()},
-      scales:{x:{display:false}, y:{display:false}}
-    }
-  });
+  renderRankList('chartSakha', sakhaEntries);
 
   const projMap = {};
   filteredData.forEach(r => { const k = r['โครงการ']||'ไม่ระบุ'; projMap[k] = (projMap[k]||0)+1; });
-  const projEntries = Object.entries(projMap).sort((a,b) => b[1]-a[1]).slice(0,15);
-
-  if (chartProject) chartProject.destroy();
-  chartProject = new Chart(document.getElementById('chartProject'), {
-    type: 'bar',
-    data: {
-      labels: projEntries.map(e => e[0].replace(/^[A-Z0-9]+ /,'')),
-      datasets: [{
-        label: 'จำนวนรายการ',
-        data: projEntries.map(e => e[1]),
-        backgroundColor: projEntries.map((_,i) => `hsl(${30+i*18},80%,${45+(i%3)*7}%)`),
-        borderRadius: 6, borderSkipped: false,
-      }]
-    },
-    options: {
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      layout:{padding:{left:4,right:60}},
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw.toLocaleString()} รายการ`}}, datalabels: rankDatalabels()},
-      scales:{x:{display:false}, y:{display:false}}
-    }
-  });
+  const projEntries = Object.entries(projMap).sort((a,b) => b[1]-a[1]).slice(0,15)
+    .map(e => [e[0].replace(/^[A-Z0-9]+ /,''), e[1]]);
+  renderRankList('chartProject', projEntries);
 
   // Ranking: กลุ่มดำเนินการ (การดำเนินการ)
   const damnoenMap = {};
   filteredData.forEach(r => { const k = r['การดำเนินการ']||'ไม่ระบุ'; damnoenMap[k] = (damnoenMap[k]||0)+1; });
   const damnoenEntries = Object.entries(damnoenMap).sort((a,b) => b[1]-a[1]);
-
-  const damnoenColors = damnoenEntries.map((_,i) => {
-    const hues = [210,195,220,230,215,200,240,205,225,235];
-    return `hsl(${hues[i%hues.length]},70%,${48+(i%3)*7}%)`;
-  });
-
-  if (chartDamnoen) chartDamnoen.destroy();
-  chartDamnoen = new Chart(document.getElementById('chartDamnoen'), {
-    type: 'bar',
-    data: {
-      labels: damnoenEntries.map(e => e[0]),
-      datasets: [{
-        label: 'จำนวนรายการ',
-        data: damnoenEntries.map(e => e[1]),
-        backgroundColor: damnoenColors,
-        borderRadius: 5, borderSkipped: false,
-      }]
-    },
-    options: {
-      indexAxis:'y', responsive:true, maintainAspectRatio:false,
-      layout:{padding:{left:4,right:60}},
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${ctx.raw.toLocaleString()} รายการ`}}, datalabels: rankDatalabels()},
-      scales:{x:{display:false}, y:{display:false}}
-    }
-  });
-
+  renderRankList('chartDamnoen', damnoenEntries);
 }
 
 function getActionCategories() {
