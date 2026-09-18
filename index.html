@@ -104,9 +104,10 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .rank-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .rank-row:last-child{margin-bottom:0}
 .rank-num{width:20px;flex-shrink:0;text-align:right;color:#94a3b8;font-weight:700;font-size:.85rem}
-.rank-bar-track{flex:1;display:flex;align-items:center;min-width:0}
-.rank-bar{height:34px;border-radius:8px;display:flex;align-items:center;padding:0 14px;color:#fff;font-weight:700;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:width .35s ease;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.15)}
-.rank-value{margin-left:8px;background:rgba(31,27,45,.85);color:#fff;font-weight:800;font-size:.82rem;padding:5px 11px;border-radius:6px;flex-shrink:0;white-space:nowrap}
+.rank-bar-track{flex:1;position:relative;display:flex;align-items:center;min-width:0;padding-right:72px}
+.rank-bar{height:34px;border-radius:8px;display:flex;align-items:center;padding:0 14px;overflow:hidden;transition:width .35s ease;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.rank-label{background:rgba(0,0,0,.22);color:#fff;font-weight:700;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:3px 9px;border-radius:6px;max-width:100%}
+.rank-value{position:absolute;right:0;top:50%;transform:translateY(-50%);background:rgba(31,27,45,.85);color:#fff;font-weight:800;font-size:.82rem;padding:5px 11px;border-radius:6px;white-space:nowrap}
 .rank-empty{padding:24px;text-align:center;color:#94a3b8;font-size:.9rem}
 .data-table{width:100%;border-collapse:collapse;font-size:.9rem}
 .data-table th{background:linear-gradient(135deg,#42A5F5,#1E88E5);color:#fff;padding:12px 14px;text-align:left;font-weight:700;font-size:.88rem;white-space:nowrap;position:sticky;top:0}
@@ -439,7 +440,7 @@ function renderRankList(containerId, entries) {
       <div class="rank-row">
         <span class="rank-num">${i+1}</span>
         <div class="rank-bar-track">
-          <div class="rank-bar" style="width:${pct}%;background:${rankColor(i)}">${label}</div>
+          <div class="rank-bar" style="width:${pct}%;background:${rankColor(i)}"><span class="rank-label">${label}</span></div>
           <span class="rank-value">${val.toLocaleString()}</span>
         </div>
       </div>`;
