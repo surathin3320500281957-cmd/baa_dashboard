@@ -68,6 +68,9 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .dk-badge-rent{background:#E8F5E9;color:#2E7D32}
 .dk-badge-debt{background:#FFEBEE;color:#C62828}
 .dk-badge-debt.zero{background:#F1F3F4;color:#9AA0A6}
+.dk-chip{background:var(--bg);border-color:var(--c);border-left-width:8px;color:#1F2937}
+.dk-chip:hover{border-color:var(--c);filter:brightness(.97)}
+.dk-chip.active{background:var(--c);border-color:var(--c);color:#fff}
 .dk-chip.active .dk-badge{background:rgba(255,255,255,.25)!important;color:#fff!important}
 .reset-bar{
   display:flex;align-items:center;justify-content:space-between;
@@ -375,8 +378,6 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
             <th style="min-width:130px">กำหนดต่อสัญญา</th>
             <th style="min-width:200px">กิจกรรม</th>
             <th style="min-width:120px">การดำเนินการ</th>
-            <th style="min-width:120px">กลุ่มดำเนินการ</th>
-            <th style="min-width:100px">สถานะสัญญา</th>
             <th style="min-width:280px">หมายเหตุ</th>
           </tr>
         </thead>
@@ -538,6 +539,7 @@ function buildCheckboxesSimple(containerId, vals) {
   });
 }
 
+const DK_COLORS={1:'#1D4ED8',2:'#0E7490',3:'#6D28D9',4:'#A21CAF',5:'#C2410C',6:'#A16207',7:'#4D7C0F',8:'#4338CA',9:'#0F766E',10:'#B91C1C',11:'#0369A1',12:'#15803D',13:'#475569'};
 function buildDamnoenkanCheckboxes(containerId, vals) {
   const container = document.getElementById(containerId);
   vals.forEach(val => {
@@ -549,6 +551,8 @@ function buildDamnoenkanCheckboxes(containerId, vals) {
     const chip = document.createElement('label');
     chip.className = 'cb-chip dk-chip';
     chip.dataset.colorClass = 'active';
+    const dkc = DK_COLORS[parseInt(val)] || '#475569';
+    chip.style.cssText = `--c:${dkc};--bg:${dkc}1A`;
     chip.innerHTML = `
       <div class="dk-top"><input type="checkbox" value="${val}">${val}</div>
       <div class="dk-stats">
@@ -867,8 +871,6 @@ function renderDetailTable() {
     const tr = document.createElement('tr');
     const badgeClass = statusColors[r['กำหนดต่อสัญญา']]||'badge-default';
     const note = (r['หมายเหตุ']||'').replace(/</g,'&lt;');
-    const sathana = r['สถานะสัญญา']||'';
-    const sathanaClass = sathana==='ไม่ต่อสัญญาเช่า'?'badge-danger':sathana==='ปกติ'?'badge-success':'badge-default';
     tr.innerHTML = `
       <td class="td-top center" style="color:var(--text-muted);font-size:.8rem">${i+1}</td>
       <td class="td-top">${r['สาขา']||''}</td>
@@ -879,7 +881,6 @@ function renderDetailTable() {
       <td class="td-top center"><span class="badge ${badgeClass}">${r['กำหนดต่อสัญญา']||''}</span></td>
       <td class="td-top">${r['กิจกรรม']||''}</td>
       <td class="td-top">${r['การดำเนินการ']||''}</td>
-      <td class="td-top center"><span class="badge ${sathanaClass}">${sathana}</span></td>
       <td class="td-note">${note}</td>
     `;
     body.appendChild(tr);
@@ -985,11 +986,11 @@ function exportSummaryPDF(btn){
 }
 
 function exportDetailExcel() {
-  const headers=['#','สาขา','โครงการ','ชื่อผู้ทำสัญญา','วันที่เริ่มต้น','วันที่สิ้นสุด','กำหนดต่อสัญญา','กิจกรรม','การดำเนินการ','สถานะสัญญา','หมายเหตุ'];
-  const rows=detailFiltered.map((r,i)=>[i+1,r['สาขา'],r['โครงการ'],r['ชื่อผู้ทำสัญญา'],r['วันที่เริ่มต้น'],r['วันที่สิ้นสุด'],r['กำหนดต่อสัญญา'],r['กิจกรรม'],r['การดำเนินการ'],r['สถานะสัญญา'],r['หมายเหตุ']]);
+  const headers=['#','สาขา','โครงการ','ชื่อผู้ทำสัญญา','วันที่เริ่มต้น','วันที่สิ้นสุด','กำหนดต่อสัญญา','กิจกรรม','การดำเนินการ','หมายเหตุ'];
+  const rows=detailFiltered.map((r,i)=>[i+1,r['สาขา'],r['โครงการ'],r['ชื่อผู้ทำสัญญา'],r['วันที่เริ่มต้น'],r['วันที่สิ้นสุด'],r['กำหนดต่อสัญญา'],r['กิจกรรม'],r['การดำเนินการ'],r['หมายเหตุ']]);
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
-  ws['!cols']=[5,30,40,25,12,12,20,40,25,15,60].map(w=>({wch:w}));
+  ws['!cols']=[5,30,40,25,12,12,20,40,25,60].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb,ws,'รายละเอียด');
   XLSX.writeFile(wb,'detail_contract.xlsx');
 }
