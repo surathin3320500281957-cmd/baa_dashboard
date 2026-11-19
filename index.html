@@ -69,7 +69,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .dk-badge-debt{background:#FFEBEE;color:#C62828}
 .dk-badge-debt.zero{background:#F1F3F4;color:#9AA0A6}
 .dk-chip{background:var(--bg);border-color:var(--c);border-left-width:8px;color:#1F2937}
-.dk-chip:hover{border-color:var(--c);filter:brightness(.97)}
+@media(hover:hover){.dk-chip:hover{filter:brightness(.97)}}
 .dk-chip.active{background:var(--c);border-color:var(--c);color:#fff}
 .dk-chip.active .dk-badge{background:rgba(255,255,255,.25)!important;color:#fff!important}
 .reset-bar{
@@ -515,7 +515,7 @@ function buildCheckboxes(containerId, field, colorMap) {
       const cb = chip.querySelector('input');
       cb.checked = !cb.checked;
       chip.classList.toggle(chip.dataset.colorClass, cb.checked);
-      applyFilters();
+      scheduleApply();
     });
     container.appendChild(chip);
   });
@@ -533,7 +533,7 @@ function buildCheckboxesSimple(containerId, vals) {
       const cb = chip.querySelector('input');
       cb.checked = !cb.checked;
       chip.classList.toggle('active', cb.checked);
-      applyFilters();
+      scheduleApply();
     });
     container.appendChild(chip);
   });
@@ -565,7 +565,7 @@ function buildDamnoenkanCheckboxes(containerId, vals) {
       const cb = chip.querySelector('input');
       cb.checked = !cb.checked;
       chip.classList.toggle('active', cb.checked);
-      applyFilters();
+      scheduleApply();
     });
     container.appendChild(chip);
   });
@@ -623,7 +623,10 @@ function refreshDamnoenkanStats() {
   });
 }
 
+let _applyT=null;
+function scheduleApply(){ clearTimeout(_applyT); _applyT=setTimeout(applyFilters,30); }
 function applyFilters() {
+  clearTimeout(_applyT);
   filteredData = getFilteredExcept(null);
   detailFiltered = [...filteredData];
   currentPage = 1;
@@ -864,14 +867,17 @@ function renderSummaryTable() {
   body.appendChild(trTotal);
 }
 
+let _detailGen=0;
 function renderDetailTable() {
   const body = document.getElementById('detailBody');
+  const gen = ++_detailGen;
   body.innerHTML = '';
-  detailFiltered.forEach((r,i) => {
-    const tr = document.createElement('tr');
+  const rows = detailFiltered;
+  const CH = 150;
+  const rowHtml = (r,i) => {
     const badgeClass = statusColors[r['กำหนดต่อสัญญา']]||'badge-default';
     const note = (r['หมายเหตุ']||'').replace(/</g,'&lt;');
-    tr.innerHTML = `
+    return `<tr>
       <td class="td-top center" style="color:var(--text-muted);font-size:.8rem">${i+1}</td>
       <td class="td-top">${r['สาขา']||''}</td>
       <td class="td-top">${r['โครงการ']||''}</td>
@@ -882,10 +888,20 @@ function renderDetailTable() {
       <td class="td-top">${r['กิจกรรม']||''}</td>
       <td class="td-top">${r['การดำเนินการ']||''}</td>
       <td class="td-note">${note}</td>
-    `;
-    body.appendChild(tr);
-  });
-  document.getElementById('detailCount').textContent = `แสดงทั้งหมด ${detailFiltered.length.toLocaleString()} รายการ`;
+    </tr>`;
+  };
+  let pos = 0;
+  const step = () => {
+    if (gen !== _detailGen) return;            // มีการกรองใหม่แล้ว ยกเลิกรอบเก่า
+    const end = Math.min(pos + CH, rows.length);
+    let h = '';
+    for (let i = pos; i < end; i++) h += rowHtml(rows[i], i);
+    body.insertAdjacentHTML('beforeend', h);
+    pos = end;
+    if (pos < rows.length) requestAnimationFrame(step);
+  };
+  step();
+  document.getElementById('detailCount').textContent = `แสดงทั้งหมด ${rows.length.toLocaleString()} รายการ`;
 }
 
 function renderPagination() {
