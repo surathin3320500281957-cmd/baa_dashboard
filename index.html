@@ -57,10 +57,13 @@ body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min
 .cb-chip.active-warning{background:var(--warning);border-color:var(--warning);color:#fff}
 .cb-chip.active-success{background:var(--success);border-color:var(--success);color:#fff}
 .cb-chip.active-info{background:var(--info);border-color:var(--info);color:#fff}
+#cbDamnoenkan{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#cbDamnoenkan .dk-chip{width:100%;height:100%}
+@media(max-width:700px){#cbDamnoenkan{grid-template-columns:1fr}.dk-stats{display:flex;flex-wrap:wrap}.dk-badge{text-align:left}}
 .dk-chip{display:flex;flex-direction:column;align-items:flex-start;gap:7px;border-radius:12px;padding:10px 14px}
 .dk-top{display:flex;align-items:center;gap:8px;font-size:1.056rem}
-.dk-stats{display:flex;flex-wrap:wrap;gap:6px}
-.dk-badge{padding:3px 10px;border-radius:10px;font-size:.912rem;font-weight:700;white-space:nowrap}
+.dk-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}
+.dk-badge{padding:3px 10px;border-radius:10px;font-size:.912rem;font-weight:700;white-space:nowrap;text-align:center}
 .dk-badge-cnt{background:#E3F2FD;color:#1565C0}
 .dk-badge-rent{background:#E8F5E9;color:#2E7D32}
 .dk-badge-debt{background:#FFEBEE;color:#C62828}
@@ -629,7 +632,7 @@ function resetFilters() {
   ['cbKamnod','cbNotify','cbActivity','cbDamnoenkan'].forEach(id => {
     document.querySelectorAll(`#${id} .cb-chip`).forEach(chip => {
       chip.querySelector('input').checked = false;
-      chip.className = 'cb-chip';
+      chip.classList.remove('active','active-danger','active-warning','active-success','active-info');
     });
   });
   filteredData = [...RAW_DATA];
